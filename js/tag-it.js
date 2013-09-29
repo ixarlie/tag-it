@@ -83,6 +83,9 @@
             // Optionally set a tabindex attribute on the input that gets
             // created for tag-it.
             tabIndex: null,
+            
+            // Whether to only create tags only from autocomplete suggestions
+            requireAutocomplete: false,
 
             // Event callbacks.
             beforeTagAdded      : null,
@@ -149,6 +152,7 @@
                     }
                     showChoices(choices);
                 };
+                this.options.requireAutocomplete = false;
             }
 
             if (this.options.showAutocompleteOnFocus) {
@@ -158,6 +162,16 @@
 
                 if (typeof this.options.autocomplete.minLength === 'undefined') {
                     this.options.autocomplete.minLength = 0;
+                }
+            }
+            
+            if(typeof this.options.autocomplete.attributes !== 'undefined') {
+                if(typeof this.options.autocomplete.attributes.inputValue === 'undefined') {
+                    this.options.autocomplete.attributes = 'undefined';
+                } else {
+                    if(typeof this.options.autocomplete.attributes.tagValue === 'undefined') {
+                        this.options.autocomplete.attributes.tagValue = 'value';
+                    }
                 }
             }
 
@@ -235,46 +249,56 @@
                     } else if (that.options.removeConfirmation) {
                         that._lastTag().removeClass('remove ui-state-highlight');
                     }
-
-                    // Comma/Space/Enter are all valid delimiters for new tags,
-                    // except when there is an open quote or if setting allowSpaces = true.
-                    // Tab will also create a tag, unless the tag input is empty,
-                    // in which case it isn't caught.
-                    if (
-                        event.which === $.ui.keyCode.COMMA ||
-                        event.which === $.ui.keyCode.ENTER ||
-                        (
-                            event.which == $.ui.keyCode.TAB &&
-                            that.tagInput.val() !== ''
-                        ) ||
-                        (
-                            event.which == $.ui.keyCode.SPACE &&
-                            that.options.allowSpaces !== true &&
+                    
+                    if (that.options.requireAutocomplete !== true) {
+                        // Comma/Space/Enter are all valid delimiters for new tags,
+                        // except when there is an open quote or if setting allowSpaces = true.
+                        // Tab will also create a tag, unless the tag input is empty,
+                        // in which case it isn't caught.
+                        if (
+                            event.which === $.ui.keyCode.COMMA ||
+                            event.which === $.ui.keyCode.ENTER ||
                             (
-                                $.trim(that.tagInput.val()).replace( /^s*/, '' ).charAt(0) != '"' ||
+                                event.which == $.ui.keyCode.TAB &&
+                                that.tagInput.val() !== ''
+                            ) ||
+                            (
+                                event.which == $.ui.keyCode.SPACE &&
+                                that.options.allowSpaces !== true &&
                                 (
-                                    $.trim(that.tagInput.val()).charAt(0) == '"' &&
-                                    $.trim(that.tagInput.val()).charAt($.trim(that.tagInput.val()).length - 1) == '"' &&
-                                    $.trim(that.tagInput.val()).length - 1 !== 0
+                                    $.trim(that.tagInput.val()).replace( /^s*/, '' ).charAt(0) != '"' ||
+                                    (
+                                        $.trim(that.tagInput.val()).charAt(0) == '"' &&
+                                        $.trim(that.tagInput.val()).charAt($.trim(that.tagInput.val()).length - 1) == '"' &&
+                                        $.trim(that.tagInput.val()).length - 1 !== 0
+                                    )
                                 )
                             )
-                        )
-                    ) {
-                        // Enter submits the form if there's no text in the input.
-                        if (!(event.which === $.ui.keyCode.ENTER && that.tagInput.val() === '')) {
-                            event.preventDefault();
-                        }
+                        ) {
+                            // Enter submits the form if there's no text in the input.
+                            if (!(event.which === $.ui.keyCode.ENTER && that.tagInput.val() === '')) {
+                                event.preventDefault();
+                            }
 
-                        // Autocomplete will create its own tag from a selection and close automatically.
-                        if (!that.tagInput.data('autocomplete-open')) {
-                            that.createTag(that._cleanedInput());
+                            // Autocomplete will create its own tag from a selection and close automatically.
+                            if (!that.tagInput.data('autocomplete-open')) {
+                                that.createTag(that._cleanedInput());
+                            }
                         }
+                    } else if (event.which == $.ui.keyCode.ENTER) {
+                        event.preventDefault();
                     }
                 }).blur(function(e){
                     // Create a tag when the element loses focus.
                     // If autocomplete is enabled and suggestion was clicked, don't add it.
                     if (!that.tagInput.data('autocomplete-open')) {
-                        that.createTag(that._cleanedInput());
+                        if (that.options.requireAutocomplete !== true) {
+                            that.createTag(that._cleanedInput());    
+                        } else {
+                            setTimeout(function () { that.tagInput.val(""); }, 0);
+                        }
+                    } else {
+                        setTimeout(function () { that.tagInput.val(""); }, 0);
                     }
                 });
 
@@ -282,7 +306,14 @@
             if (this.options.availableTags || this.options.tagSource || this.options.autocomplete.source) {
                 var autocompleteOptions = {
                     select: function(event, ui) {
-                        that.createTag(ui.item.value);
+                        // Defined properties for label and input value
+                        if(that.options.autocomplete.attributes !== 'undefined') {
+                            var tagValue = ui.item[that.options.autocomplete.attributes.tagValue];
+                            var inputValue = ui.item[that.options.autocomplete.attributes.inputValue];
+                            that.createTag(tagValue, undefined, inputValue, undefined);
+                        } else {
+                            that.createTag(ui.item.value);    
+                        }
                         // Preventing the tag input to be updated with the chosen value.
                         return false;
                     }
@@ -386,9 +417,9 @@
             return Boolean($.effects && ($.effects[name] || ($.effects.effect && $.effects.effect[name])));
         },
 
-        createTag: function(value, additionalClass, duringInitialization) {
+        createTag: function(value, additionalClass, inputValue, duringInitialization) {
             var that = this;
-
+            
             value = $.trim(value);
 
             if(this.options.preprocessTag) {
@@ -399,8 +430,8 @@
                 return false;
             }
 
-            if (!this.options.allowDuplicates && !this._isNew(value)) {
-                var existingTag = this._findTagByLabel(value);
+            if (!this.options.allowDuplicates && !this._isNew(typeof inputValue === 'undefined' ? value : inputValue)) {
+                var existingTag = this._findTagByLabel(typeof inputValue === 'undefined' ? value : inputValue);
                 if (this._trigger('onTagExists', null, {
                     existingTag: existingTag,
                     duringInitialization: duringInitialization
@@ -444,13 +475,14 @@
 
             // Unless options.singleField is set, each tag has a hidden input field inline.
             if (!this.options.singleField) {
-                var escapedValue = label.html();
+                var escapedValue = typeof inputValue === 'undefined' ? label.html() : inputValue;
                 tag.append('<input type="hidden" style="display:none;" value="' + escapedValue + '" name="' + this.options.fieldName + '" />');
             }
 
             if (this._trigger('beforeTagAdded', null, {
                 tag: tag,
                 tagLabel: this.tagLabel(tag),
+                inputValue: inputValue,
                 duringInitialization: duringInitialization
             }) === false) {
                 return;
