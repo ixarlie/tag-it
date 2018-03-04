@@ -89,6 +89,26 @@ For example:
 
 The default `autocomplete.source` function filters the strings in **availableTags** and subtracts the already assigned tags. It also positions autocomplete underneath tag input. See the full list of available options [here](http://jqueryui.com/demos/autocomplete/).
 
+### autocomplete.attributes (Object)
+
+Allows select what data from selected item is stored in `tag` label and `input` value attribute.
+
+Case of use, a search in Ajax / XHR Response to get some elements, the response can contains aditional information
+as label, id, ..., and anothers. `inputValue` must be the attribute in response to set in value attribute,
+`tagValue`, not mandatory, is the attribute in response to set in tag label.
+
+When `select` is fired in `autocomplete`, `ui.item` contains the properties in `tagValue` and `inputValue`.
+
+For example:
+
+    $("#myTags").tagit({
+        autocomplete: {attributes: { inputValue: "id", tagValue: "value"}}
+    });
+
+Whether `tagValue` is not defined, defaults to *value*
+
+Defaults to *false*
+
 ### showAutocompleteOnFocus (boolean)
 
 Shows autocomplete when the tag input first receives focus, before the user even types anything.
@@ -162,6 +182,11 @@ Optionally set a *tabindex* attribute on the `input` that gets created for tag-i
 
 Defaults to *null*
 
+### requireAutocomplete (boolean)
+
+When enabled, tags will only be created when selected from options presented
+by autocomplete.
+
 ### placeholderText (String)
 Optionally set a *placeholder* attribute on the `input` that gets created for tag-it user input.
 
@@ -174,7 +199,7 @@ Defaults to *null*
 
 Can be used to add custom behaviour before the tag is added to the DOM.
 
-The function receives a null event, and an object containing the properties `tag`, `tagLabel`, and `duringInitialization`.
+The function receives a null event, and an object containing the properties `tag`, `tagLabel`, `inputValue` and `duringInitialization`.
 
 `duringInitialization` is a boolean indicating whether the tag was added during the initial construction of this widget,
 e.g. when initializing tag-it on an input with preloaded data. You can use this to tell whether the event was initiated by
@@ -247,10 +272,11 @@ Returns an array of the text values of all the tags currently in the widget.
 
     $("#myTags").tagit("assignedTags");
 
-### createTag(tagLabel, additionalClass)
+### createTag(tagLabel, additionalClass, inputValue)
 Adds new tag to the list. The `additionalClass` parameter is an optional way to add classes to the tag element.
+The `inputValue` parameter forced the value in the input value attribute
 
-    $("#myTags").tagit("createTag", "brand-new-tag");
+    $("#myTags").tagit("createTag", "brand-new-tag", "7");
 
 ### preprocessTag(function, Callback)
 Set a function to be called before tag is created. Callback receives the
